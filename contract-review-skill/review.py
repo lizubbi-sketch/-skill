@@ -1,148 +1,111 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
-contract-review-skill review tool
-Author: ecom-legal team template
+contract-review-skill
+Lightweight contract reviewer for agent/agency/service-provider agreements.
+Usage:
+  python review.py --contract examples/sample_contract.txt --rules rules/default_rules.yaml --out report.json
 """
-
-import argparse
-import json
-import re
+import argparse, json, sys, re
 from pathlib import Path
-from difflib import unified_diff
+from difflib import SequenceMatcher
 
 try:
     import yaml
 except Exception:
     print("Missing dependency 'pyyaml'. Install with: pip install pyyaml")
-    raise
+    sys.exit(1)
 
 def load_text(path):
     return Path(path).read_text(encoding='utf-8')
 
-def load_yaml(path):
+def load_rules(path):
     return yaml.safe_load(Path(path).read_text(encoding='utf-8'))
 
-def split_paragraphs(text):
-    # 按空行分段，保留顺序
-    paras = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
-    return paras
+def normalize_text(s):
+    # 简单正则清洗，保留中文与英数标点等
+    s = s.replace('\r\n', '\n')
+    s = re.sub(r'\s+', ' ', s)
+    return s.strip()
 
-def find_matches(paragraphs, pattern):
+def presence_check(text, keywords):
     hits = []
-    prog = re.compile(pattern, flags=re.I | re.S)
-    for idx, p in enumerate(paragraphs):
-        if prog.search(p):
-            hits.append({'index': idx, 'paragraph': p})
+    for k in keywords:
+        if re.search(re.escape(k), text, flags=re.I):
+            hits.append({'keyword': k, 'found': True})
+        else:
+            hits.append({'keyword': k, 'found': False})
     return hits
 
-def apply_template(template_text, context):
-    # 简单替换占位符
-    out = template_text.format(**context)
-    return out.strip()
+def forbidden_check(text, keywords):
+    hits = []
+    for k in keywords:
+        m = re.search(re.escape(k), text, flags=re.I)
+        hits.append({'keyword': k, 'found': bool(m), 'snippet': m.group(0) if m else None})
+    return hits
 
-def make_unified_diff(original, replacement, name='contract'):
-    # returns unified diff string
-    orig_lines = original.splitlines(keepends=True)
-    rep_lines = replacement.splitlines(keepends=True)
-    diff_lines = list(unified_diff(orig_lines, rep_lines, fromfile=f'{name}.orig', tofile=f'{name}.mod', lineterm=''))
-    return ''.join(diff_lines)
+def split_sentences(text):
+    # 基本中文/英文句子切分（轻量）
+    text = text.replace('。', '。\n').replace('；', '；\n').replace(';', ';\n').replace('\n', '\n')
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    return lines
 
-def make_inline_redline(original, replacement):
-    # inline style: mark whole paragraph delete and insert (simple)
-    out = []
-    out.append("<<DELETE>>")
-    out.append(original)
-    out.append("<<END DELETE>>")
-    out.append("<<ADD>>")
-    out.append(replacement)
-    out.append("<<END ADD>>")
-    return '\n'.join(out)
+def duplication_check(text, threshold=0.85):
+    sentences = split_sentences(text)
+    dup_pairs = []
+    n = len(sentences)
+    for i in range(n):
+        for j in range(i+1, n):
+            a,b = sentences[i], sentences[j]
+            if len(a) < 10 or len(b) < 10:
+                continue
+            ratio = SequenceMatcher(None, a, b).ratio()
+            if ratio >= threshold:
+                dup_pairs.append({'a': a, 'b': b, 'ratio': round(ratio,3)})
+    return dup_pairs
 
-def review_contract(contract_path, rules_path, templates_path, intensity='balanced', out_json=None, redline_path=None, redline_format='unified'):
-    text = load_text(contract_path)
-    paragraphs = split_paragraphs(text)
-    rules_doc = load_yaml(rules_path)
-    templates_doc = load_yaml(templates_path)
-    defaults = templates_doc.get('defaults', {})
-    report = {
-        'contract': str(contract_path),
-        'summary': {
-            'paragraphs': len(paragraphs),
-            'issues_found': 0
-        },
-        'matches': []
-    }
-    used_paragraphs = set()
-    for rule in rules_doc.get('rules', []):
-        rid = rule.get('id')
-        desc = rule.get('description')
-        pattern = rule.get('pattern')
-        severity = rule.get('severity', 'info')
-        matches = find_matches(paragraphs, pattern)
-        for m in matches:
-            idx = m['index']
-            orig_par = m['paragraph']
-            # prepare suggestion
-            template_map = templates_doc.get('templates', {}).get(rid, {})
-            suggestion_template = template_map.get(intensity) or template_map.get('balanced') or ("建议文本（缺省）: 请人工审阅")
-            context = {
-                'platform_name': defaults.get('platform_name', '平台'),
-                'tax_rate': defaults.get('tax_rate', '')
-            }
-            suggestion = apply_template(suggestion_template, context)
-            # create diffs
-            if redline_format == 'unified':
-                diff = make_unified_diff(orig_par + '\n', suggestion + '\n', name=f'para_{idx}_{rid}')
-                redline_text = diff
-            else:
-                redline_text = make_inline_redline(orig_par, suggestion)
-            report['matches'].append({
-                'rule_id': rid,
-                'description': desc,
-                'severity': severity,
-                'paragraph_index': idx,
-                'original_paragraph': orig_par,
-                'suggested_replacement': suggestion,
-                'redline': redline_text
-            })
-            used_paragraphs.add(idx)
-    report['summary']['issues_found'] = len(report['matches'])
-
-    # Output JSON
-    if out_json:
-        Path(out_json).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
-
-    # Output redline aggregated file (if provided)
-    if redline_path:
-        lines = []
-        for item in report['matches']:
-            header = f"=== Rule: {item['rule_id']} ({item['severity']}) ===\nDescription: {item['description']}\nParagraph index: {item['paragraph_index']}\n"
-            lines.append(header)
-            lines.append(item['redline'])
-            lines.append('\n\n')
-        Path(redline_path).write_text('\n'.join(lines), encoding='utf-8')
-
+def taxonomy_checks(text, rules):
+    report = {}
+    report['required'] = presence_check(text, rules.get('required_keywords', []))
+    report['forbidden'] = forbidden_check(text, rules.get('forbidden_keywords', []))
+    report['attribution'] = presence_check(text, rules.get('attribution_terms', []))
+    report['cps_cpa'] = presence_check(text, rules.get('cps_cpa_terms', []))
     return report
 
-def main():
-    parser = argparse.ArgumentParser(description='contract-review-skill: review and suggest redlines for agent contracts')
-    parser.add_argument('--contract', '-c', required=True, help='contract txt file path (utf-8)')
-    parser.add_argument('--rules', '-r', default='rules/default_rules.yaml', help='rules yaml path')
-    parser.add_argument('--templates', '-t', default='templates/redline_templates.yaml', help='templates yaml path')
-    parser.add_argument('--intensity', choices=['mild','balanced','strong'], default='balanced', help='suggestion strength')
-    parser.add_argument('--out', help='output json report path (optional)')
-    parser.add_argument('--redline', help='output redline file path (optional)')
-    parser.add_argument('--format', choices=['unified','inline'], default='unified', help='redline format')
-    args = parser.parse_args()
+def definitions_conflict_check(text, defined_terms):
+    # 简单检测同义或重复定义出现多次（在合同定义章节重复出现词）
+    defs = {}
+    # heuristic: lines that contain '定义' or '指' are candidate definition lines
+    lines = split_sentences(text)
+    for ln in lines:
+        for term in defined_terms:
+            if term in ln and ('指' in ln or '定义' in ln or ':' in ln):
+                defs.setdefault(term, []).append(ln)
+    conflicts = {k:v for k,v in defs.items() if len(v) > 1}
+    return conflicts
 
-    report = review_contract(args.contract, args.rules, args.templates, args.intensity, args.out, args.redline, args.format)
-    print("Review complete. Issues found:", report['summary']['issues_found'])
-    if args.out:
-        print("JSON report:", args.out)
-    if args.redline:
-        print("Redline file:", args.redline)
+def tax_duplication_check(text, tax_terms):
+    hits = []
+    for t in tax_terms:
+        cnt = len(re.findall(re.escape(t), text, flags=re.I))
+        if cnt > 1:
+            hits.append({'term': t, 'count': cnt})
+    return hits
 
-if __name__ == '__main__':
-    main()
+def termination_settlement_check(text, phrases):
+    hits = []
+    for p in phrases:
+        if re.search(re.escape(p), text, flags=re.I):
+            hits.append({'phrase': p, 'found': True})
+        else:
+            hits.append({'phrase': p, 'found': False})
+    return hits
+
+def run_checks(contract_text, rules):
+    t = normalize_text(contract_text)
+    out = {}
+    out['meta'] = {'length_chars': len(t)}
+    out['duplication'] = duplication_check(t, threshold=rules.get('duplication_threshold', 0.88))
+    out['taxonomy'] = taxonomy_checks(t, rules)
+    out['definitions_conflict'] = definitions_conflict_check(t, rules.get('defined_terms', []))
+    out['tax_duplication'] = tax_duplication_check(t, rules.get('tax_terms', []))
+    out['termination_settlement'] = termination
