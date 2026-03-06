@@ -1,0 +1,74 @@
+# default_rules.yaml
+#
+# 每个 rule 包含:
+# - id: 唯一标识
+# - description: 简短说明
+# - pattern: 匹配正则（用于在合同中定位片段）
+# - tags: 便于分类
+# - severity: informational / medium / high
+rules:
+  - id: data_ownership
+    description: "关于合作过程中数据归属、服务商采集数据是否强制归属平台"
+    pattern: "(数据资产|属于1688的数据资产|归1688所有|数据所有权).{0,200}"
+    tags: ["data","ownership"]
+    severity: high
+
+  - id: confidentiality
+    description: "保密条款过宽或缺少期限/例外"
+    pattern: "(保密义务|秘密信息).{0,200}"
+    tags: ["confidentiality"]
+    severity: medium
+
+  - id: ip_assignment
+    description: "知识产权一刀切归平台"
+    pattern: "(知识产权.*归1688所有|全部归1688所有|均归1688所有)"
+    tags: ["ip"]
+    severity: medium
+
+  - id: attribution
+    description: "归因/专属搜索词/渠道码逻辑是否明确（userid口径、冲突处理）"
+    pattern: "(专属搜索词|渠道码|归因|匹配.*搜索词|userid|用户ID)"
+    tags: ["attribution"]
+    severity: high
+
+  - id: cpa_cps_logic
+    description: "CPA 与 CPS 的并行或抵扣规则缺失或模糊"
+    pattern: "(CPA|CPS|阶梯制|封顶).*"
+    tags: ["pricing","billing"]
+    severity: high
+
+  - id: termination_settlement
+    description: "终止与结算优先关系（合同期是否覆盖结算期，邮件确认无待结算）"
+    pattern: "(终止.*结算|合同期.*结算期|无待结算金额|邮件确认.*待结算)"
+    tags: ["termination","settlement"]
+    severity: high
+
+  - id: freeze_deduction
+    description: "平台冻结/扣款/追溯的权限（是否有申诉流程、时限）"
+    pattern: "(冻结|扣减|追回|追溯).{0,120}"
+    tags: ["fraud","deduction"]
+    severity: high
+
+  - id: evidence_provision
+    description: "对账/对账清单/平台是否需提供证据"
+    pattern: "(对账|对账清单|明细|发票|开票).*"
+    tags: ["operations","evidence"]
+    severity: medium
+
+  - id: duplicate_defs
+    description: "重复定义或冗余定义（如商家、用户/推广对象重复）"
+    pattern: "(商家|推广对象|1688用户).{0,80}"
+    tags: ["definitions"]
+    severity: medium
+
+  - id: tax_duplication
+    description: "税点或开票信息重复表述"
+    pattern: "(增值税|税率|税点).{0,80}"
+    tags: ["tax"]
+    severity: low
+
+  - id: audit_retention
+    description: "审计与证据保留义务缺失或不明确"
+    pattern: "(审计|保留.*证据|保存.*记录)"
+    tags: ["audit"]
+    severity: medium
