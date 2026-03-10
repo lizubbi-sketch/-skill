@@ -11,3 +11,9 @@
 
 ```diff
 {{redline_content}}
+修改理由说明
+{{reasoning}}
+引用条款：{{rule_reference}}
+风险提示：{{risk_warning}}
+最终推荐文案
+{{final_safe_text}}
