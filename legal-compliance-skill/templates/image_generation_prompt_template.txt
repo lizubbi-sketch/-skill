@@ -1,0 +1,28 @@
+# 图片合规修复与生成建议
+
+## 原图审核结论：{{status}} (存在侵权风险 / 需重制)
+
+## 原图问题分析
+- **违规元素**: {{violated_elements}} (例如：知名卡通形象 Loopy、大牌 Logo Dior)
+- **风险类型**: {{risk_type}} (版权侵权 / 商标侵权 / 肖像权风险)
+- **违规依据**: {{rule_reference}}
+
+## 推荐重制方案 (AI 绘画提示词)
+为了规避上述风险，建议使用以下 Prompt 生成全新的、无版权风险的素材：
+
+**Positive Prompt (正向提示词):**
+"""
+{{safe_prompt_positive}}
+(Style: Professional B2B illustration, clean background, 1688 brand colors if applicable, no text, high resolution, 4k)
+"""
+
+**Negative Prompt (负向提示词 - 务必包含):**
+"""
+{{safe_prompt_negative}}
+(text, watermark, logo, brand name, copyright character, cartoon mascot, real person face, low quality, blurry, distorted)
+"""
+
+## 给设计师的执行建议
+1. 请勿直接临摹原图构图，需改变视角或元素布局。
+2. 确保生成的图像中不包含任何可识别的第三方商标或受版权保护的角色特征。
+3. 如需展示商品，请使用通用模型或已获得授权的商家实拍图（需脱敏）。
