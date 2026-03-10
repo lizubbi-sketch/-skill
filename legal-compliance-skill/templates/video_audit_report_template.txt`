@@ -1,0 +1,25 @@
+```text
+# 视频素材合规审核报告
+
+## 审核结论：{{status}} (通过 / 需修改 / 高风险禁止)
+
+## 时间轴违规定位
+
+| 时间段 | 画面/音频内容描述 | 违规类型 | 风险等级 | 修改建议 |
+| :--- | :--- | :--- | :--- | :--- |
+| {{time_start}} - {{time_end}} | {{content_desc}} | {{violation_type}} | {{risk_level}} | {{suggestion}} |
+| ... | ... | ... | ... | ... |
+
+## 重点帧截图分析 (如有)
+- **帧位置**: {{frame_timestamp}}
+  - **问题**: {{frame_issue}}
+  - **建议**: {{frame_fix}}
+
+## 整体合规建议
+{{general_advice}}
+- 关于背景音乐版权：{{music_advice}}
+- 关于字幕规范性：{{subtitle_advice}}
+- 关于口播合规性：{{voiceover_advice}}
+
+## 引用条款
+{{rule_references}}
